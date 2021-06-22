@@ -34,13 +34,14 @@ reg [1:0] current_wr_line_buffer;
 reg [1:0] current_rd_line_buffer;
 reg [8:0] pixel_wr_counter; 
 reg [8:0] pixel_rd_counter;
-reg [10:0] total_pixel_counter;
+reg [11:0] total_pixel_counter;
 reg read_data;
 reg [3:0] line_buffer_read;
-reg [23:0] line_buffer0_data;
-reg [23:0] line_buffer1_data;
-reg [23:0] line_buffer2_data;
-reg [23:0] line_buffer3_data;
+reg [3:0] line_buffer_data_valid;
+wire [23:0] line_buffer0_data;
+wire [23:0] line_buffer1_data;
+wire [23:0] line_buffer2_data;
+wire [23:0] line_buffer3_data;
 reg read_state;
 
 localparam IDLE = 'b0,
@@ -126,6 +127,12 @@ begin
             total_pixel_counter <= total_pixel_counter + 1;
 end
 
+always @ (*)
+begin
+    line_buffer_data_valid = 0;
+    line_buffer_data_valid[current_wr_line_buffer] = input_pixel_valid;
+end
+
 //pixel output logic
 always @ (*)
 begin
@@ -159,7 +166,7 @@ line_buffer line_buffer0(
 .clk(clk),
 .rst(rst),
 .pixel_input(pixel_input),
-.input_valid(input_pixel_valid),
+.input_valid(line_buffer_data_valid[0]),
 .read_data(line_buffer_read[0]),
 .pixel_output(line_buffer0_data)
     );    
@@ -168,7 +175,7 @@ line_buffer line_buffer1(
 .clk(clk),
 .rst(rst),
 .pixel_input(pixel_input),
-.input_valid(input_pixel_valid),
+.input_valid(line_buffer_data_valid[1]),
 .read_data(line_buffer_read[1]),
 .pixel_output(line_buffer1_data)
     );
@@ -177,7 +184,7 @@ line_buffer line_buffer2(
 .clk(clk),
 .rst(rst),
 .pixel_input(pixel_input),
-.input_valid(input_pixel_valid),
+.input_valid(line_buffer_data_valid[2]),
 .read_data(line_buffer_read[2]),
 .pixel_output(line_buffer2_data)
     );   
@@ -186,10 +193,11 @@ line_buffer line_buffer3(
 .clk(clk),
 .rst(rst),
 .pixel_input(pixel_input),
-.input_valid(input_pixel_valid),
+.input_valid(line_buffer_data_valid[3]),
 .read_data(line_buffer_read[3]),
-.pixel_output(line_buffe3_data)
+.pixel_output(line_buffer3_data)
     );
 
 
 endmodule
+
