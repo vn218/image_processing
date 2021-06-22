@@ -37,26 +37,24 @@ output [23:0] pixel_output
     always @ (posedge clk)
     begin
         if(rst)
-        begin
-            rd_ptr <= 'b0;
             wrt_ptr <= 'b0;
-        end    
+        else if (input_valid)
+            wrt_ptr <= wrt_ptr + 'b1;    
     end
     
     
     always @ (posedge clk)
     begin
         if(input_valid)
-        begin
             linebuffer[wrt_ptr] <= pixel_input;
-            wrt_ptr <= wrt_ptr + 'b1;
-        end
     end
     
     
     always @ (posedge clk)
     begin
-        if(read_data)
+        if (rst)
+            rd_ptr <= 'b0;
+        else if(read_data)
             rd_ptr <= rd_ptr + 'b1;    
     end
 endmodule
