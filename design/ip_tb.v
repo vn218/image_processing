@@ -89,7 +89,7 @@ begin
     @ (posedge clk)
     img_data_valid <= 1'b0;
     @ (posedge intr)
-    for (i = 0; i < 4*512; i = i + 1)
+    for (i = 0; i < 512; i = i + 1)
     begin
         @ (posedge clk)
         imgData <= 0;
@@ -98,7 +98,7 @@ begin
     @ (posedge clk)
     img_data_valid <= 1'b0;
     @ (posedge intr)
-    for (i = 0; i < 4*512; i = i + 1)
+    for (i = 0; i < 512; i = i + 1)
     begin
         @ (posedge clk)
         imgData <= 0;
