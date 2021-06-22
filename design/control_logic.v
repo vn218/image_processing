@@ -56,22 +56,26 @@ begin
         output_intr <= 'b0;
         end
     else
+        begin
         case (read_state)
             IDLE:
             begin
             output_intr <= 'b0;
             if (total_pixel_counter >= 1536)
-                read_state <= RD_BUFFER;
+                begin
+                read_state <= RD_BUFFER;               
+                end
             end 
             RD_BUFFER:
             begin
             if (pixel_rd_counter == 511)
                 begin
                 read_state <= IDLE;
-                output_intr <= 'b1;
+                output_intr <= 'b1;             
                 end
             end
         endcase         
+        end
 end
 
 //read_state output
@@ -94,11 +98,13 @@ begin
         pixel_wr_counter <= 'd0;
         end
     else
+        begin
         if (input_pixel_valid)
             pixel_wr_counter <= pixel_wr_counter + 1;
         if (pixel_wr_counter == 511 && input_pixel_valid)
             current_wr_line_buffer <= current_wr_line_buffer + 1;
-end                         
+        end
+end                   
 
 //read counters
 always @ (posedge clk)
@@ -109,10 +115,12 @@ begin
         pixel_rd_counter <= 'd0;
         end
     else
+        begin
         if (read_data)
             pixel_rd_counter <= pixel_rd_counter + 1;
         if (pixel_rd_counter == 511 && read_data)
             current_rd_line_buffer <= current_rd_line_buffer + 1;
+        end    
 end
 
 //total pixel counter
@@ -121,10 +129,12 @@ begin
     if (rst)
         total_pixel_counter <= 'd0;
     else
+        begin
         if (read_data && !input_pixel_valid)
             total_pixel_counter <= total_pixel_counter - 1;                              
         else if ( !read_data && input_pixel_valid)
             total_pixel_counter <= total_pixel_counter + 1;
+        end    
 end
 
 always @ (*)
@@ -140,22 +150,34 @@ begin
         0: 
         begin 
         output_pixel_data = {line_buffer0_data,line_buffer1_data,line_buffer2_data};    
-        line_buffer_read = 4'b0111;
+        line_buffer_read[0] = read_data; 
+        line_buffer_read[1] = read_data;
+        line_buffer_read[2] = read_data;
+        line_buffer_read[3] = 0;
         end
         1:
         begin
         output_pixel_data = {line_buffer1_data,line_buffer2_data,line_buffer3_data};    
-        line_buffer_read = 4'b1110;
+        line_buffer_read[0] = 0; 
+        line_buffer_read[1] = read_data;
+        line_buffer_read[2] = read_data;
+        line_buffer_read[3] = read_data;
         end
         2: 
         begin
         output_pixel_data = {line_buffer2_data,line_buffer3_data,line_buffer0_data};
-        line_buffer_read = 4'b1101;
+        line_buffer_read[0] = read_data; 
+        line_buffer_read[1] = 0;
+        line_buffer_read[2] = read_data;
+        line_buffer_read[3] = read_data;
         end
         3: 
         begin
         output_pixel_data = {line_buffer3_data,line_buffer0_data,line_buffer1_data};
-        line_buffer_read = 4'b1011;
+        line_buffer_read[0] = read_data; 
+        line_buffer_read[1] = read_data;
+        line_buffer_read[2] = 0;
+        line_buffer_read[3] = read_data;
         end    
     endcase            
 end            
