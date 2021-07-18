@@ -93,7 +93,7 @@ always @ (posedge clk) begin
 end
 
 always @ (posedge clk) begin
-    o_pixel <= sumData/4;
+    o_pixel <= sumData/8;
     o_pixel_valid <= sumDatavalid;
 end
 
