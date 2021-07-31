@@ -3,9 +3,9 @@
 // Company: 
 // Engineer: 
 // 
-// Create Date: 22.06.2021 15:34:56
+// Create Date: 30.07.2021 02:51:22
 // Design Name: 
-// Module Name: ip_tb
+// Module Name: control_logic
 // Project Name: 
 // Target Devices: 
 // Tool Versions: 
@@ -18,122 +18,177 @@
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
-
-`define headerSize 1080
-`define total_image_size 512*512
-
-module ip_tb(
+   
+module control_logic
+#(parameter HEIGHT = 256,
+            WIDTH =256,
+            DECOMPOSITION_LEVEL = 1)
+(
+input clk,rst,
+input [15:0] i_mac,
+input i_mac_valid,
+output [15:0] o_mac,
+output wire o_mac_valid,
+output wire o_mac_mode,
+output wire [$clog2(WIDTH)-1:0] o_mac_row_column_pointer,
+output wire [$clog2(WIDTH)-1:0] o_mac_pixel_pointer,
+output reg [7:0] axi_out,
+output reg axi_valid,
+input i_mac_mode,
+input [$clog2(WIDTH)-1:0] i_mac_row_column_pointer,
+input [$clog2(WIDTH)-1:0] i_mac_pixel_pointer    
     );
+wire memory_select;
+wire [$clog2(HEIGHT*WIDTH)-1:0] rd_addr1;
+wire [$clog2(HEIGHT*WIDTH)-1:0] rd_addr2;
+wire [$clog2(HEIGHT*WIDTH)-1:0] w_addr1;
+wire [$clog2(HEIGHT*WIDTH)-1:0] w_addr2;
+reg [7:0] mem1_in1;
+reg [7:0] mem1_in2;
+wire [7:0] mem1_out1;
+wire [7:0] mem1_out2;
+reg [7:0] mem2_in1;
+reg [7:0] mem2_in2;
+wire [7:0] mem2_out1;
+wire [7:0] mem2_out2;
+wire [15:0] mem_out;
 
-reg clk;
-reg rst;
-reg [7:0] imgData;
-integer f_input, f_output, i, sent_size;
-reg img_data_valid;
-wire intr;
-wire [7:0] out_data;
-wire out_data_valid;
-integer received_data = 0;
+reg mode;
+reg [$clog2(WIDTH)-1:0] pixel_pointer;
+reg [$clog2(WIDTH)-1:0] row_column_pointer;
+reg read;
+reg [2:0] level;
+reg [7:0] dividend;
 
-initial
-begin
-    clk = 1'b0;
-    forever
-    begin
-        #5 clk = ~clk;
+assign memory_select = mode;
+assign mem_out = memory_select?{mem2_out1,mem2_out2}:{mem1_out1,mem1_out2};
+assign o_mac = mem_out;
+
+always @ (*) begin
+    if (memory_select) begin
+        mem1_in1 <= i_mac[15:8];
+        mem1_in2 <= i_mac[7:0];
+    end
+    else if (!memory_select) begin
+        mem2_in1 <= i_mac[15:8];
+        mem2_in2 <= i_mac[7:0];
+    end    
+end
+
+always @ (posedge clk) begin
+    if (rst)
+        pixel_pointer <= 0;
+    else if(read) begin
+        if ((mode == 0 && pixel_pointer == WIDTH/dividend - 2)||(mode == 1 && pixel_pointer == HEIGHT/dividend - 2))
+            pixel_pointer <= 0;    
+        else
+            pixel_pointer <= pixel_pointer + 2;         
     end
 end
 
-initial
-begin
-    rst = 0;
-    sent_size = 0;
-    img_data_valid = 0;
-    #100;
-    rst = 1;
-    #100;
-    f_input = $fopen("<name of the input image>", "rb");
-    f_output = $fopen("<name of the output image>", "wb");
-    for (i = 0;i < `headerSize;i = i+1)
-    begin
-        $fscanf(f_input, "%c", imgData);
-        $fwrite(f_output, "%c", imgData);
-    end
-    
-    for (i = 0; i < 4*512; i = i + 1)
-    begin
-        @ (posedge clk)
-        $fscanf(f_input, "%c", imgData);
-        img_data_valid <= 1'b1;
-    end
-    sent_size = 4*512;
-    
-    
-    @ (posedge clk)
-    img_data_valid <= 1'b0;
-    
-    while(sent_size < `total_image_size)
-    begin
-        @ (posedge intr);
-        for (i = 0; i < 512; i = i + 1)
-        begin
-            @ (posedge clk)
-            $fscanf(f_input, "%c", imgData);
-            img_data_valid <= 1'b1;
+always @ (posedge clk) begin
+    if (rst)
+        row_column_pointer <= 0;
+    else if(read) begin
+        if ((mode == 0 && pixel_pointer == WIDTH/dividend - 2)||(mode == 1 && pixel_pointer == HEIGHT/dividend - 2))
+        begin    
+            if ((mode == 0 && row_column_pointer == HEIGHT/dividend - 1)||( mode == 1 && row_column_pointer == WIDTH/dividend-1)) begin
+                row_column_pointer <= 0;
+                read <= 0;    
+            end
+            else 
+                row_column_pointer <= row_column_pointer + 1;        
         end
-        @(posedge clk)
-        img_data_valid <= 1'b0;
-        sent_size = sent_size + 512;
     end
-    
-    @ (posedge clk)
-    img_data_valid <= 1'b0;
-    @ (posedge intr)
-    for (i = 0; i < 512; i = i + 1)
-    begin
-        @ (posedge clk)
-        imgData <= 0;
-        img_data_valid <= 1'b1;
-    end
-    @ (posedge clk)
-    img_data_valid <= 1'b0;
-    @ (posedge intr)
-    for (i = 0; i < 512; i = i + 1)
-    begin
-        @ (posedge clk)
-        imgData <= 0;
-        img_data_valid <= 1'b1;
-    end
-    @ (posedge clk)
-    img_data_valid <= 1'b0;
-    $fclose(f_input);
 end
 
-always @ (posedge clk)
-begin
-    if (out_data_valid)
-    begin
-        $fwrite(f_output, "%c", out_data);
-        received_data = received_data + 1;
-    end
-    if (received_data == `total_image_size)
-    begin
-        $fclose(f_output);
-        $stop;
-    end
-    
+assign rd_addr1 = mode? pixel_pointer*WIDTH + row_column_pointer : row_column_pointer*WIDTH + pixel_pointer;    
+assign rd_addr2 = mode? (pixel_pointer+1)*WIDTH + row_column_pointer : row_column_pointer*WIDTH + pixel_pointer+1;
+
+
+
+assign o_mac_mode = mode;
+assign o_mac_row_column_pointer = row_column_pointer;
+assign o_mac_pixel_pointer = pixel_pointer;
+assign o_mac_valid = read;
+
+assign w_addr1 = i_mac_mode? (i_mac_pixel_pointer/2)*WIDTH + i_mac_row_column_pointer : i_mac_row_column_pointer*WIDTH + i_mac_pixel_pointer/2;
+assign w_addr2 = i_mac_mode? (i_mac_pixel_pointer/2 + HEIGHT/(2*dividend))*WIDTH + i_mac_row_column_pointer : i_mac_row_column_pointer*WIDTH + i_mac_pixel_pointer/2 + WIDTH/(2*dividend);
+
+always @ (posedge clk) begin
+    if (rst) begin
+        mode <= 0;
+        level <= 0;
+        dividend <= 1;
+        read <= 1;
+    end     
+    else if(i_mac_valid) begin
+        case (i_mac_mode)
+            0: begin 
+                if (i_mac_pixel_pointer == WIDTH/dividend - 2 && i_mac_row_column_pointer == HEIGHT/dividend - 1) begin 
+                    mode <= 1;
+                    read <= 1;
+                end
+                end    
+                1: begin 
+                if (i_mac_pixel_pointer == HEIGHT/dividend - 2 && i_mac_row_column_pointer == WIDTH/dividend -1) begin 
+                    mode <= 0;
+                    level <= level + 1;
+                    dividend <= dividend*2;
+                    if ( level < DECOMPOSITION_LEVEL - 1 ) read <= 1;                    
+                end
+                end    
+        endcase
+    end        
 end
 
-ip_top dut(
-    .axi_clk(clk),
-    .axi_rst(rst),
-    .i_data_valid(img_data_valid),
-    .i_data(imgData),
-    .o_data_ready(),
-    .o_data_valid(out_data_valid),
-    .o_data(out_data),
-    .i_data_ready(),
-    .intr(intr)
+always @ (posedge clk) begin
+    if (rst)
+        axi_valid <= 0;
+    else if ( level == DECOMPOSITION_LEVEL ) begin
+        axi_valid <= 1;
+        axi_out <= mem1_out1;
+        if (pixel_pointer == WIDTH - 1) begin
+            pixel_pointer <= 0;
+            row_column_pointer <= row_column_pointer + 1;
+        end        
+        else
+            pixel_pointer <= pixel_pointer + 1;
+    end
+end        
+        
+       
+img_memory #(
+.HEIGHT(HEIGHT),
+.WIDTH(WIDTH))
+mem1(
+.pixel_in1(mem1_in1),
+.pixel_in2(mem1_in2),
+.pixel_out1(mem1_out1),
+.pixel_out2(mem1_out2),
+.enable1(1),
+.wr_enable1(memory_select&i_mac_valid),
+.enable2(1),
+.wr_enable2(memory_select&i_mac_valid),
+.addr1(memory_select?w_addr1:rd_addr1),
+.addr2(memory_select?w_addr2:rd_addr2),
+.clk(clk)
     );
-
+img_memory #( 
+.HEIGHT(HEIGHT),
+.WIDTH(WIDTH))
+mem2(
+.pixel_in1(mem2_in1),
+.pixel_in2(mem2_in2),
+.pixel_out1(mem2_out1),
+.pixel_out2(mem2_out2),
+.enable1(1),
+.wr_enable1(!memory_select&i_mac_valid),
+.enable2(1),
+.wr_enable2(!memory_select&i_mac_valid),
+.addr1(memory_select?rd_addr1:w_addr1),
+.addr2(memory_select?rd_addr2:w_addr2),
+.clk(clk)
+    );          
+          
 endmodule
